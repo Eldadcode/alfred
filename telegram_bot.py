@@ -165,8 +165,12 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("You are not authorized to use Alfred")
         return ConversationHandler.END
 
+    alfred_logger.info(
+        f"Converstaion started with user: {update.message.from_user.username}"
+    )
+
     await update.message.reply_text(
-        'Which stocks would you like me to analyze?\n\nI can analyze a single ticker, such as: "NVDA", or multiple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
+        'Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: "NVDA", or multiple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
     )
     return PICK_STOCKS
 
@@ -178,7 +182,7 @@ async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ]
 
     await update.message.reply_text(
-        f"""Stocks received: {', '.join(context.user_data["stocks"])}. Now choose your output format."""
+        f"""Stocks received: {', '.join(context.user_data["stocks"])} 🔥"""
     )
 
     # Present options for output format
@@ -231,6 +235,7 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
 
     stock_tickers = context.user_data["stocks"]
     alfred_logger.info("Generating Table response")
+    await query.message.reply_text("Working on it... 📝")
 
     df = pd.DataFrame(columns=stock_tickers, index=TABLE_ROWS)
     for ticker in stock_tickers:
@@ -262,8 +267,9 @@ async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
 
     stock_tickers = context.user_data["stocks"]
-
     alfred_logger.info("Generating Message response")
+    
+    await query.message.reply_text("Working on it... 📝")
 
     for ticker in stock_tickers:
         alfred_logger.info(f"Analyzing {ticker}")
