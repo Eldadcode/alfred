@@ -13,6 +13,7 @@ import warnings
 from telegram.warnings import PTBUserWarning
 import os
 import re
+from pathlib import Path
 
 from apis.danelfin import DanelfinAPI, DanelfinScores
 from apis.tipranks import MyTipRanks, TipRanksScores
@@ -37,6 +38,7 @@ tipranks = MyTipRanks(tr_username, tr_password)
 alfred_logger.info("TipRanks API Successfully initalized")
 
 AUTHORIZED_USERS = ("eld4d", "absdotan")
+CSV_TABLE_FILE = "stock_analysis.csv"
 AUTHORIZED_IDS = (1734405151,)
 PICK_STOCKS = 1
 CHOOSE_OUTPUT = 2
@@ -176,8 +178,9 @@ async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Present options for output format
     keyboard = [
-        [InlineKeyboardButton("Table", callback_data="table")],
-        [InlineKeyboardButton("Message", callback_data="message")],
+        [InlineKeyboardButton("Table 📖", callback_data="table")],
+        [InlineKeyboardButton("Message 💬", callback_data="message")],
+        [InlineKeyboardButton("File 📁", callback_data="file")],
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -200,6 +203,15 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     elif query.data == "table":
         try:
+            context.args = ["table"]
+            await analyze_stocks_table(update, context)
+        except Exception as e:
+            print(e)
+            raise e
+
+    elif query.data == "file":
+        try:
+            context.args = ["file"]
             await analyze_stocks_table(update, context)
         except Exception as e:
             print(e)
@@ -215,21 +227,29 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
     stock_tickers = context.user_data["stocks"]
     alfred_logger.info("Generating Table response")
 
-    try:
-        df = pd.DataFrame(columns=stock_tickers, index=TABLE_ROWS)
-        for ticker in stock_tickers:
-            alfred_logger.info(f"Analyzing {ticker}")
-            combined_scores = CombinedScores.from_ticker(ticker)
-            if combined_scores.tipranks._raw_data:
-                generate_stock_info_table(df, combined_scores)
-            else:
-                alfred_logger.error(f"Received unknown ticker: {ticker}")
-                continue
+    df = pd.DataFrame(columns=stock_tickers, index=TABLE_ROWS)
+    for ticker in stock_tickers:
+        alfred_logger.info(f"Analyzing {ticker}")
+        combined_scores = CombinedScores.from_ticker(ticker)
+        if combined_scores.tipranks._raw_data:
+            generate_stock_info_table(df, combined_scores)
+        else:
+            alfred_logger.error(f"Received unknown ticker: {ticker}")
+            continue
 
+    if context.args[0] == "file":
+        try:
+            with Path(CSV_TABLE_FILE).open("w"):
+                df.to_csv(CSV_TABLE_FILE, index=True)
+
+            with Path(CSV_TABLE_FILE).open("rb") as document:
+                await query.message.reply_document(document)
+        finally:
+            os.remove(CSV_TABLE_FILE)
+
+    elif context.args[0] == "table":
         table = f'<pre>{tabulate(df, headers="keys", tablefmt="grid")}</pre>'
         await query.message.reply_text(table, parse_mode=ParseMode.HTML)
-    except Exception as e:
-        print(e)
 
 
 async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -240,23 +260,20 @@ async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_T
 
     alfred_logger.info("Generating Message response")
 
-    try:
-        for ticker in stock_tickers:
-            alfred_logger.info(f"Analyzing {ticker}")
+    for ticker in stock_tickers:
+        alfred_logger.info(f"Analyzing {ticker}")
 
-            combined_scores = CombinedScores.from_ticker(ticker)
+        combined_scores = CombinedScores.from_ticker(ticker)
 
-            if combined_scores.tipranks._raw_data:
-                stock_info_response = generate_stock_info_message(combined_scores)
-            else:
-                stock_info_response = f"I didn't find any information about {ticker} 😔"
-                alfred_logger.error(f"Received unknown ticker: {ticker}")
+        if combined_scores.tipranks._raw_data:
+            stock_info_response = generate_stock_info_message(combined_scores)
+        else:
+            stock_info_response = f"I didn't find any information about {ticker} 😔"
+            alfred_logger.error(f"Received unknown ticker: {ticker}")
 
-            await query.message.reply_text(
-                stock_info_response, parse_mode=ParseMode.MARKDOWN_V2
-            )
-    except Exception as e:
-        print(e)
+        await query.message.reply_text(
+            stock_info_response, parse_mode=ParseMode.MARKDOWN_V2
+        )
 
 
 def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
