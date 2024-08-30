@@ -12,3 +12,5 @@ python-multipart
 tipranks
 python-telegram-bot
 yfinance
+tabulate
+colorlog
