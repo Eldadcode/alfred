@@ -24,18 +24,8 @@ import pandas as pd
 from tabulate import tabulate
 from logger import alfred_logger
 from dataclasses import dataclass
+import toml
 
-warnings.filterwarnings("ignore", category=PTBUserWarning)
-danelfin = DanelfinAPI(os.environ["DANELFIN_API_KEY"])
-alfred_logger.info("Danelfin API Successfully initalized")
-
-bridgewise = BridgewiseAPI(os.environ["BRIDGEWISE_API_KEY"])
-companies_from_scanner = bridgewise.get_companies_from_scanner()
-alfred_logger.info("Bridgewise API Successfully initalized")
-
-tr_username, tr_password = os.environ["TIPRANKS_CREDS"].split(":")
-tipranks = MyTipRanks(tr_username, tr_password)
-alfred_logger.info("TipRanks API Successfully initalized")
 
 AUTHORIZED_USERS = ("eld4d", "absdotan")
 CSV_TABLE_FILE = "stock_analysis.csv"
@@ -59,6 +49,21 @@ TABLE_ROWS = (
     "6 Months Gain",
     "YTD Gain",
 )
+API_KEYS_FILE = "api_keys.toml"
+
+warnings.filterwarnings("ignore", category=PTBUserWarning)
+api_keys = toml.loads(Path(API_KEYS_FILE).read_text())
+
+danelfin = DanelfinAPI(api_keys["danelfin"])
+alfred_logger.info("Danelfin API Successfully initalized")
+
+bridgewise = BridgewiseAPI(api_keys["bridgewise"])
+companies_from_scanner = bridgewise.get_companies_from_scanner()
+alfred_logger.info("Bridgewise API Successfully initalized")
+
+tr_username, tr_password = api_keys["tipranks"].split(":")
+tipranks = MyTipRanks(tr_username, tr_password)
+alfred_logger.info("TipRanks API Successfully initalized")
 
 
 @dataclass
@@ -293,7 +298,7 @@ conv_handler = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", cancel)],  # Fallback for cancellation
 )
-app = ApplicationBuilder().token(os.environ["TELEGRAM_TOKEN"]).build()
+app = ApplicationBuilder().token(api_keys["telegram"]).build()
 
 app.add_handler(conv_handler)
 
