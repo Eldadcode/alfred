@@ -166,7 +166,7 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return ConversationHandler.END
 
     await update.message.reply_text(
-        'Which stocks would you like me to analyze?\n\nI can analyze a single ticker, such as: "NVDA", or multuple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
+        'Which stocks would you like me to analyze?\n\nI can analyze a single ticker, such as: "NVDA", or multiple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
     )
     return PICK_STOCKS
 
@@ -282,7 +282,7 @@ async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_T
 
 
 def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    update.message.reply_text("Conversation canceled.")
+    update.message.reply_text("Conversation cancelled.")
     return ConversationHandler.END
 
 
