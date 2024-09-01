@@ -159,15 +159,11 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
 async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if not is_valid_user(update.message.from_user):
-        alfred_logger.warning(
-            f"Unauthozired access from user: {update.message.from_user.username}"
-        )
+        alfred_logger.warning(f"Unauthozired access from {update.message.from_user}")
         await update.message.reply_text("You are not authorized to use Alfred")
         return ConversationHandler.END
 
-    alfred_logger.info(
-        f"Converstaion started with user: {update.message.from_user.username}"
-    )
+    alfred_logger.info(f"Converstaion started with {update.message.from_user}")
 
     await update.message.reply_text(
         'Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: "NVDA", or multiple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
@@ -181,6 +177,7 @@ async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         x.strip().upper() for x in update.message.text.split(",")
     ]
 
+    alfred_logger.info(f"""Stocks picked: {context.user_data["stocks"]}""")
     await update.message.reply_text(
         f"""Stocks received: {', '.join(context.user_data["stocks"])} 🔥"""
     )
@@ -207,7 +204,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         try:
             await analyze_stocks_message(update, context)
         except Exception as e:
-            print(e)
+            alfred_logger.error(e)
             raise e
 
     elif query.data == "table":
@@ -215,7 +212,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.args = ["table"]
             await analyze_stocks_table(update, context)
         except Exception as e:
-            print(e)
+            alfred_logger.error(e)
             raise e
 
     elif query.data == "file":
@@ -223,18 +220,22 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             context.args = ["file"]
             await analyze_stocks_table(update, context)
         except Exception as e:
-            print(e)
+            alfred_logger.error(e)
             raise e
 
+    alfred_logger.info("Stocks analyzed successfully")
     return ConversationHandler.END
 
 
 async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    file_response = context.args[0] == "file"
 
     stock_tickers = context.user_data["stocks"]
-    alfred_logger.info("Generating Table response")
+    alfred_logger.info(
+        f"Generating Table response for {stock_tickers}, {file_response = }"
+    )
     await query.message.reply_text("Working on it... 📝")
 
     df = pd.DataFrame(columns=stock_tickers, index=TABLE_ROWS)
@@ -247,7 +248,7 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
             alfred_logger.error(f"Received unknown ticker: {ticker}")
             continue
 
-    if context.args[0] == "file":
+    if file_response:
         try:
             with Path(CSV_TABLE_FILE).open("w"):
                 df.to_csv(CSV_TABLE_FILE, index=True)
@@ -267,8 +268,8 @@ async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_T
     await query.answer()
 
     stock_tickers = context.user_data["stocks"]
-    alfred_logger.info("Generating Message response")
-    
+    alfred_logger.info(f"Generating Message response for {stock_tickers}")
+
     await query.message.reply_text("Working on it... 📝")
 
     for ticker in stock_tickers:
