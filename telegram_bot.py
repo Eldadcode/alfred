@@ -1,5 +1,7 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User, Bot
 from telegram.constants import ParseMode
+import logging
+import asyncio
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -9,6 +11,7 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+from telegram.error import TelegramError
 import warnings
 from telegram.warnings import PTBUserWarning
 import os
@@ -30,6 +33,7 @@ import toml
 AUTHORIZED_USERS = ("eld4d", "absdotan")
 CSV_TABLE_FILE = "stock_analysis.csv"
 AUTHORIZED_IDS = (1734405151,)
+LOG_CHANNEL_CHAT_ID = -1002231338174
 PICK_STOCKS = 1
 CHOOSE_OUTPUT = 2
 TABLE_ROWS = (
@@ -52,7 +56,32 @@ TABLE_ROWS = (
 API_KEYS_FILE = "api_keys.toml"
 
 warnings.filterwarnings("ignore", category=PTBUserWarning)
+
+
+class TelegramLogHandler(logging.Handler):
+    def __init__(self, bot_token: str, chat_id: str):
+        super().__init__()
+        self.bot = Bot(token=bot_token)
+        self.chat_id = chat_id
+        self.loop = asyncio.get_event_loop()
+
+    def emit(self, record: logging.LogRecord):
+        log_entry = self.format(record)
+        # Schedule the send_message coroutine to run in the event loop
+        asyncio.run_coroutine_threadsafe(self.send_message(log_entry), self.loop)
+
+    async def send_message(self, message: str):
+        try:
+            await self.bot.send_message(chat_id=self.chat_id, text=message)
+        except TelegramError as e:
+            print(f"Failed to send log message to Telegram: {e}")
+
+
 api_keys = toml.loads(Path(API_KEYS_FILE).read_text())
+
+TELEGRAM_TOKEN = api_keys["telegram"]
+telegram_handler = TelegramLogHandler(TELEGRAM_TOKEN, LOG_CHANNEL_CHAT_ID)
+alfred_logger.addHandler(telegram_handler)
 
 danelfin = DanelfinAPI(api_keys["danelfin"])
 alfred_logger.info("Danelfin API Successfully initalized")
@@ -305,7 +334,7 @@ conv_handler = ConversationHandler(
     },
     fallbacks=[CommandHandler("cancel", cancel)],  # Fallback for cancellation
 )
-app = ApplicationBuilder().token(api_keys["telegram"]).build()
+app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 app.add_handler(conv_handler)
 
