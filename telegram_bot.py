@@ -15,6 +15,7 @@ from telegram.error import TelegramError
 import warnings
 from telegram.warnings import PTBUserWarning
 import os
+from typing import List
 import re
 from pathlib import Path
 
@@ -30,9 +31,10 @@ from dataclasses import dataclass
 import toml
 
 
-AUTHORIZED_USERS = ("eld4d", "absdotan")
+ALLOWED_USERS_PATH = "allowed_users.txt"
+ALLOWED_IDS_PATH = "allowed_ids.txt"
+
 CSV_TABLE_FILE = "stock_analysis.csv"
-AUTHORIZED_IDS = (1734405151,)
 LOG_CHANNEL_CHAT_ID = -1002231338174
 PICK_STOCKS = 1
 CHOOSE_OUTPUT = 2
@@ -114,7 +116,13 @@ class CombinedScores:
 
 
 def is_valid_user(user: User) -> bool:
-    return user.username in AUTHORIZED_USERS or user.id in AUTHORIZED_IDS
+    def get_allowed_users() -> List[str]:
+        return Path(ALLOWED_USERS_PATH).read_text().splitlines()
+
+    def get_allowed_ids() -> List[str]:
+        return Path(ALLOWED_IDS_PATH).read_text().splitlines()
+
+    return user.username in get_allowed_users() or user.id in get_allowed_ids()
 
 
 def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores):
