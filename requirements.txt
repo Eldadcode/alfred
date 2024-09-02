@@ -1,13 +1,6 @@
 requests
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-gspread
 toml
 pandas
-fastapi
-jinja2
-uvicorn
 python-multipart
 tipranks
 python-telegram-bot
