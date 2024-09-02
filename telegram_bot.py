@@ -242,7 +242,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             await analyze_stocks_message(update, context)
         except Exception as e:
             alfred_logger.error(e)
-            raise e
+            return ConversationHandler.END
 
     elif query.data == "table":
         try:
@@ -250,7 +250,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             await analyze_stocks_table(update, context)
         except Exception as e:
             alfred_logger.error(e)
-            raise e
+            return ConversationHandler.END
 
     elif query.data == "file":
         try:
@@ -258,7 +258,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             await analyze_stocks_table(update, context)
         except Exception as e:
             alfred_logger.error(e)
-            raise e
+            return ConversationHandler.END
 
     alfred_logger.info("Stocks analyzed successfully")
     return ConversationHandler.END
