@@ -2,6 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User, B
 from telegram.constants import ParseMode
 import logging
 import asyncio
+from collections import defaultdict
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -202,14 +203,18 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Store user stocks input
-    context.user_data["stocks"] = [
-        x.strip().upper() for x in update.message.text.split(",")
-    ]
+    tickers = [x.strip().upper() for x in update.message.text.split(",")]
 
-    alfred_logger.info(f"""Stocks picked: {context.user_data["stocks"]}""")
+    alfred_logger.info(f"""Stocks picked: {tickers}""")
     await update.message.reply_text(
-        f"""Stocks received: {', '.join(context.user_data["stocks"])} 🔥"""
+        f"""Stocks received: {', '.join(tickers)} 🔥 Working on it... 📝"""
     )
+    combined_scores_per_ticker = defaultdict(CombinedScores)
+    for ticker in tickers:
+        alfred_logger.info(f"Analyzing {ticker}")
+        combined_scores_per_ticker[ticker] = CombinedScores.from_ticker(ticker)
+
+    context.user_data["combined_scores_per_ticker"] = combined_scores_per_ticker
 
     # Present options for output format
     keyboard = [
@@ -232,6 +237,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     if query.data == "message":
         try:
             await analyze_stocks_message(update, context)
+            return CHOOSE_OUTPUT
         except Exception as e:
             alfred_logger.error(e)
             return ConversationHandler.END
@@ -240,6 +246,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         try:
             context.args = ["table"]
             await analyze_stocks_table(update, context)
+            return CHOOSE_OUTPUT
         except Exception as e:
             alfred_logger.error(e)
             return ConversationHandler.END
@@ -248,6 +255,7 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         try:
             context.args = ["file"]
             await analyze_stocks_table(update, context)
+            return CHOOSE_OUTPUT
         except Exception as e:
             alfred_logger.error(e)
             return ConversationHandler.END
@@ -259,18 +267,17 @@ async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     file_response = context.args[0] == "file"
 
-    stock_tickers = context.user_data["stocks"]
+    combined_scores_per_ticker = context.user_data["combined_scores_per_ticker"]
     alfred_logger.info(
-        f"Generating Table response for {stock_tickers}, {file_response = }"
+        f"Generating Table response for {list(combined_scores_per_ticker)}, {file_response = }"
     )
-    await query.message.reply_text("Working on it... 📝")
 
-    df = pd.DataFrame(columns=stock_tickers, index=TABLE_ROWS)
-    for ticker in stock_tickers:
-        alfred_logger.info(f"Analyzing {ticker}")
-        combined_scores = CombinedScores.from_ticker(ticker)
+    df = pd.DataFrame(columns=combined_scores_per_ticker, index=TABLE_ROWS)
+    for ticker, combined_scores in combined_scores_per_ticker.items():
+
         if combined_scores.tipranks._raw_data:
             generate_stock_info_table(df, combined_scores)
         else:
@@ -296,15 +303,12 @@ async def analyze_stocks_message(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
-    stock_tickers = context.user_data["stocks"]
-    alfred_logger.info(f"Generating Message response for {stock_tickers}")
+    combined_scores_per_ticker = context.user_data["combined_scores_per_ticker"]
+    alfred_logger.info(
+        f"Generating Message response for {list(combined_scores_per_ticker)}"
+    )
 
-    await query.message.reply_text("Working on it... 📝")
-
-    for ticker in stock_tickers:
-        alfred_logger.info(f"Analyzing {ticker}")
-
-        combined_scores = CombinedScores.from_ticker(ticker)
+    for ticker, combined_scores in combined_scores_per_ticker.items():
 
         if combined_scores.tipranks._raw_data:
             stock_info_response = generate_stock_info_message(combined_scores)
@@ -332,7 +336,8 @@ conv_handler = ConversationHandler(
         ],  # Input handling state
         CHOOSE_OUTPUT: [CallbackQueryHandler(choose_output)],
     },
-    fallbacks=[CommandHandler("cancel", cancel)],  # Fallback for cancellation
+    fallbacks=[CommandHandler("cancel", cancel)],  # Fallback for cancellation,
+    allow_reentry=True,
 )
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
