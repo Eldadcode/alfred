@@ -15,7 +15,7 @@ from telegram.error import TelegramError
 import warnings
 from telegram.warnings import PTBUserWarning
 import os
-from typing import List
+from typing import List, Generator
 import re
 from pathlib import Path
 
@@ -119,8 +119,8 @@ def is_valid_user(user: User) -> bool:
     def get_allowed_users() -> List[str]:
         return Path(ALLOWED_USERS_PATH).read_text().splitlines()
 
-    def get_allowed_ids() -> List[str]:
-        return Path(ALLOWED_IDS_PATH).read_text().splitlines()
+    def get_allowed_ids() -> Generator[int, None, None]:
+        return map(int, Path(ALLOWED_IDS_PATH).read_text().splitlines())
 
     return user.username in get_allowed_users() or user.id in get_allowed_ids()
 
