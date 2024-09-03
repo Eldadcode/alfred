@@ -1,4 +1,5 @@
 api_keys.toml
+whitelist.toml
 creds.json
 venv
 __pycache__
