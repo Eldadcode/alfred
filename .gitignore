@@ -2,5 +2,3 @@ api_keys.toml
 creds.json
 venv
 __pycache__
-allowed_users.txt
-allowed_ids.txt
