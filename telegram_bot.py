@@ -37,23 +37,6 @@ API_KEYS_FILE = "api_keys.toml"
 LOG_CHANNEL_CHAT_ID = -1002231338174
 PICK_STOCKS = 1
 CHOOSE_OUTPUT = 2
-TABLE_ROWS = (
-    "Danelfin General",
-    "Danelfin Sentiment",
-    "Danelfin Technical",
-    "Danelfin Fundamental",
-    "Bridgewise Score",
-    "Current Price",
-    "Price Target",
-    "Best Price Target",
-    "Consensus",
-    "PE Ratio",
-    "Beta",
-    "1 Month Gain",
-    "3 Months Gain",
-    "6 Months Gain",
-    "YTD Gain",
-)
 
 warnings.filterwarnings("ignore", category=PTBUserWarning)
 
@@ -119,6 +102,8 @@ def is_valid_user(user: User) -> bool:
 
 def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores):
 
+    yahoo_ticker_info = Ticker(combined_scores.ticker).info
+
     df.at["Danelfin General", combined_scores.ticker] = combined_scores.danelfin.general
     df.at["Danelfin Sentiment", combined_scores.ticker] = (
         combined_scores.danelfin.sentiment
@@ -138,13 +123,12 @@ def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores)
         combined_scores.tipranks.best_price_target
     )
     df.at["Consensus", combined_scores.ticker] = combined_scores.tipranks.consensus
-    df.at["PE Ratio", combined_scores.ticker] = combined_scores.tipranks.pe_ratio
-    try:
-        df.at["Beta", combined_scores.ticker] = Ticker(combined_scores.ticker).info[
-            "beta"
-        ]
-    except KeyError:
-        df.at["Beta", combined_scores.ticker] = None
+    df.at["P/E Ratio", combined_scores.ticker] = combined_scores.tipranks.pe_ratio
+    df.at["P/B Ratio", combined_scores.ticker] = yahoo_ticker_info.get("priceToBook")
+    df.at["PEG Ratio", combined_scores.ticker] = yahoo_ticker_info.get(
+        "trailingPegRatio"
+    )
+    df.at["Beta", combined_scores.ticker] = yahoo_ticker_info.get("beta")
     df.at["1 Month Gain", combined_scores.ticker] = (
         combined_scores.tipranks.one_month_gain
     )
@@ -159,6 +143,8 @@ def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores)
 
 def generate_stock_info_message(combined_scores: CombinedScores) -> str:
 
+    yahoo_ticker_info = Ticker(combined_scores.ticker).info
+
     response = f"📈 *Stock Analysis for {re.escape(combined_scores.tipranks.company_name)} \\({combined_scores.ticker}\\)*\n"
     response += "\n💶 *Danelfin*\n"
     response += f"• General: {combined_scores.danelfin.general}\n"
@@ -171,11 +157,15 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
     response += f"• Current Price: {re.escape(str(combined_scores.tipranks.price))}\n"
     response += f"• Price Target: {re.escape(str(combined_scores.tipranks.price_target))} \\(Best: {re.escape(str(combined_scores.tipranks.best_price_target))}\\)\n"
     response += f"• Analyst Consensus: {combined_scores.tipranks.consensus}\n"
-    response += f"• PE Ratio: {re.escape(str(combined_scores.tipranks.pe_ratio))}\n"
+    response += f"• P/E Ratio: {re.escape(str(combined_scores.tipranks.pe_ratio))}\n"
+    with suppress(KeyError):
+        response += f"• P/B Ratio: {re.escape(str(yahoo_ticker_info['priceToBook']))}\n"
     with suppress(KeyError):
         response += (
-            f"• Beta: {re.escape(str(Ticker(combined_scores.ticker).info['beta']))}\n"
+            f"• PEG Ratio: {re.escape(str(yahoo_ticker_info['trailingPegRatio']))}\n"
         )
+    with suppress(KeyError):
+        response += f"• Beta: {re.escape(str(yahoo_ticker_info['beta']))}\n"
     response += "\n🚀 *Performance*\n"
     response += f"• 1 Month: {re.escape(combined_scores.tipranks.one_month_gain)}\n"
     response += f"• 3 Months: {re.escape(combined_scores.tipranks.three_months_gain)}\n"
@@ -274,7 +264,8 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
         f"Generating Table response for {list(combined_scores_per_ticker)}, {file_response = }"
     )
 
-    df = pd.DataFrame(columns=combined_scores_per_ticker, index=TABLE_ROWS)
+    df = pd.DataFrame(columns=combined_scores_per_ticker, index=[])
+
     for ticker, combined_scores in combined_scores_per_ticker.items():
 
         if combined_scores.tipranks._raw_data:
