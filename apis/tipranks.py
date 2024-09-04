@@ -1,6 +1,7 @@
 from tipranks import TipRanks
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Optional
+from contextlib import suppress
 
 
 @dataclass
@@ -20,24 +21,29 @@ class TipRanksScores:
         return self._data["companyFullName"]
 
     @property
-    def consensus(self) -> str:
-        return self._data["analystConsensus"]["consensus"].upper()
+    def consensus(self) -> Optional[str]:
+        with suppress(AttributeError):
+            return self._data["analystConsensus"]["consensus"].upper()
 
     @property
-    def best_price_target(self) -> float:
-        return float(self._data["bestPriceTarget"])
+    def best_price_target(self) -> Optional[float]:
+        with suppress(TypeError):
+            return float(self._data["bestPriceTarget"])
 
     @property
-    def price_target(self) -> float:
-        return float(self._data["priceTarget"])
+    def price_target(self) -> Optional[float]:
+        with suppress(TypeError):
+            return float(self._data["priceTarget"])
 
     @property
-    def price(self) -> float:
-        return float(self._extra_data["research"]["price"])
+    def price(self) -> Optional[float]:
+        with suppress(TypeError):
+            return float(self._extra_data["research"]["price"])
 
     @property
-    def pe_ratio(self) -> float:
-        return float(self._data["peRatio"])
+    def pe_ratio(self) -> Optional[float]:
+        with suppress(TypeError):
+            return float(self._data["peRatio"])
 
     def _get_gain(self, months: int) -> str:
         translation = {
