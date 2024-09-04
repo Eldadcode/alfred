@@ -84,15 +84,14 @@ telegram_handler = TelegramLogHandler(TELEGRAM_TOKEN, LOG_CHANNEL_CHAT_ID)
 alfred_logger.addHandler(telegram_handler)
 
 danelfin = DanelfinAPI(api_keys["danelfin"])
-alfred_logger.info("Danelfin API Successfully initalized")
 
 bridgewise = BridgewiseAPI(api_keys["bridgewise"])
 companies_from_scanner = bridgewise.get_companies_from_scanner()
-alfred_logger.info("Bridgewise API Successfully initalized")
 
 tr_username, tr_password = api_keys["tipranks"].split(":")
 tipranks = MyTipRanks(tr_username, tr_password)
-alfred_logger.info("TipRanks API Successfully initalized")
+
+alfred_logger.info("Alfred Online")
 
 
 @dataclass
