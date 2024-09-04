@@ -1,9 +1,10 @@
-from typing import Dict
+from typing import Dict, Optional
 import argparse
 import requests
 from requests import HTTPError
 import json
 from dataclasses import dataclass
+from contextlib import suppress
 
 
 @dataclass
@@ -48,11 +49,9 @@ class DanelfinAPI:
         return json.loads(api_response.json())
 
     @staticmethod
-    def _get_score_from_graph(graph: Dict[str, str]) -> int:
-        try:
+    def _get_score_from_graph(graph: Dict[str, str]) -> Optional[int]:
+        with suppress(ValueError):
             return int(graph.split(";")[-1].split(",")[-1].rstrip("]"))
-        except ValueError:
-            return -1
 
     def get_ticker_ai_scores(self, ticker: str) -> DanelfinScores:
 
