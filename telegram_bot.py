@@ -1,4 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, User, Bot
+import concurrent.futures as cf
 from telegram.constants import ParseMode
 import logging
 import asyncio
@@ -190,6 +191,11 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     return PICK_STOCKS
 
 
+def analyze_ticker(ticker: str) -> CombinedScores:
+    alfred_logger.info(f"Analyzing {ticker}")
+    return CombinedScores.from_ticker(ticker)
+
+
 async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     # Store user stocks input
     tickers = [x.strip().upper() for x in update.message.text.split(",")]
@@ -199,9 +205,13 @@ async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"""Stocks received: {', '.join(tickers)} 🔥 Working on it... 📝"""
     )
     combined_scores_per_ticker = defaultdict(CombinedScores)
-    for ticker in tickers:
-        alfred_logger.info(f"Analyzing {ticker}")
-        combined_scores_per_ticker[ticker] = CombinedScores.from_ticker(ticker)
+    with cf.ThreadPoolExecutor() as executor:
+        future_to_ticker = {
+            executor.submit(analyze_ticker, ticker): ticker for ticker in tickers
+        }
+        for future in cf.as_completed(future_to_ticker):
+            ticker = future_to_ticker[future]
+            combined_scores_per_ticker[ticker] = future.result()
 
     context.user_data["combined_scores_per_ticker"] = combined_scores_per_ticker
 
@@ -263,6 +273,13 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
     alfred_logger.info(
         f"Generating Table response for {list(combined_scores_per_ticker)}, {file_response = }"
     )
+
+    if len(combined_scores_per_ticker) > 8 and not file_response:
+        alfred_logger.error("Too many stocks, Table is not supported")
+        await query.message.reply_text(
+            "Table response is not supported for a large amount of stocks 😢",
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
 
     df = pd.DataFrame(columns=combined_scores_per_ticker, index=[])
 
