@@ -186,7 +186,8 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     alfred_logger.info(f"Converstaion started with {update.message.from_user}")
 
     await update.message.reply_text(
-        'Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: "NVDA", or multiple tickers separated by commas, for example: "AMZN, MSFT, TSLA"'
+        "Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: `NVDA`, or multiple tickers separated by commas, for example: `AMZN`, `MSFT`, `TSLA`",
+        parse_mode=ParseMode.MARKDOWN_V2,
     )
     return PICK_STOCKS
 
