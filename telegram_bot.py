@@ -101,8 +101,9 @@ def is_valid_user(user: User) -> bool:
     return user.username in whitelist["users"] or user.id in whitelist["ids"]
 
 
-def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores):
-
+def generate_stock_info_table_for_message(
+    df: pd.DataFrame, combined_scores: CombinedScores
+):
     yahoo_ticker_info = Ticker(combined_scores.ticker).info
 
     df.at["Danelfin General", combined_scores.ticker] = combined_scores.danelfin.general
@@ -140,6 +141,49 @@ def generate_stock_info_table(df: pd.DataFrame, combined_scores: CombinedScores)
         combined_scores.tipranks.six_months_gain
     )
     df.at["YTD Gain", combined_scores.ticker] = combined_scores.tipranks.ytd_gain
+
+
+def generate_stock_info_table_for_file(
+    df: pd.DataFrame, combined_scores: CombinedScores
+):
+
+    yahoo_ticker_info = Ticker(combined_scores.ticker).info
+
+    df.at[combined_scores.ticker, "Danelfin General"] = combined_scores.danelfin.general
+    df.at[combined_scores.ticker, "Danelfin Sentiment"] = (
+        combined_scores.danelfin.sentiment
+    )
+    df.at[combined_scores.ticker, "Danelfin Technical"] = (
+        combined_scores.danelfin.technical
+    )
+    df.at[combined_scores.ticker, "Danelfin Fundamental"] = (
+        combined_scores.danelfin.fundamental
+    )
+    df.at[combined_scores.ticker, "Bridgewise Score"] = combined_scores.bridgewise
+    df.at[combined_scores.ticker, "Current Price"] = combined_scores.tipranks.price
+    df.at[combined_scores.ticker, "Price Target"] = (
+        combined_scores.tipranks.price_target
+    )
+    df.at[combined_scores.ticker, "Best Price Target"] = (
+        combined_scores.tipranks.best_price_target
+    )
+    df.at[combined_scores.ticker, "Consensus"] = combined_scores.tipranks.consensus
+    df.at[combined_scores.ticker, "P/E Ratio"] = combined_scores.tipranks.pe_ratio
+    df.at[combined_scores.ticker, "P/B Ratio"] = yahoo_ticker_info.get("priceToBook")
+    df.at[combined_scores.ticker, "PEG Ratio"] = yahoo_ticker_info.get(
+        "trailingPegRatio"
+    )
+    df.at[combined_scores.ticker, "Beta"] = yahoo_ticker_info.get("beta")
+    df.at[combined_scores.ticker, "1 Month Gain"] = (
+        combined_scores.tipranks.one_month_gain
+    )
+    df.at[combined_scores.ticker, "3 Months Gain"] = (
+        combined_scores.tipranks.three_months_gain
+    )
+    df.at[combined_scores.ticker, "6 Months Gain"] = (
+        combined_scores.tipranks.six_months_gain
+    )
+    df.at[combined_scores.ticker, "YTD Gain"] = combined_scores.tipranks.ytd_gain
 
 
 def generate_stock_info_message(combined_scores: CombinedScores) -> str:
@@ -282,12 +326,15 @@ async def analyze_stocks_table(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode=ParseMode.MARKDOWN_V2,
         )
 
-    df = pd.DataFrame(columns=combined_scores_per_ticker, index=[])
+    df = pd.DataFrame(columns=[], index=[])
 
     for ticker, combined_scores in combined_scores_per_ticker.items():
 
         if combined_scores.tipranks._raw_data:
-            generate_stock_info_table(df, combined_scores)
+            if file_response:
+                generate_stock_info_table_for_file(df, combined_scores)
+            else:
+                generate_stock_info_table_for_message(df, combined_scores)
         else:
             alfred_logger.error(f"Received unknown ticker: {ticker}")
             continue
