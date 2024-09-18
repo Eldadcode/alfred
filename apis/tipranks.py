@@ -45,13 +45,16 @@ class TipRanksScores:
         with suppress(TypeError):
             return float(self._data["peRatio"])
 
-    def _get_gain(self, months: int) -> str:
+    def _get_gain(self, months: int) -> Optional[str]:
         translation = {
             1: "oneMonthGain",
             3: "threeMonthsGain",
             6: "sixMonthsGain",
             12: "ytdGain",
         }
+
+        if self._extra_data["research"][translation[months]] is None:
+            return None
         return f'{self._extra_data["research"][translation[months]] * 100:.2f}%'
 
     @property
