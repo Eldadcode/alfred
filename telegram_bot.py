@@ -212,10 +212,18 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
     with suppress(KeyError):
         response += f"• Beta: {re.escape(str(yahoo_ticker_info['beta']))}\n"
     response += "\n🚀 *Performance*\n"
-    response += f"• 1 Month: {re.escape(combined_scores.tipranks.one_month_gain)}\n"
-    response += f"• 3 Months: {re.escape(combined_scores.tipranks.three_months_gain)}\n"
-    response += f"• 6 Months: {re.escape(combined_scores.tipranks.six_months_gain)}\n"
-    response += f"• Year To Date: {re.escape(combined_scores.tipranks.ytd_gain)}\n"
+    with suppress(TypeError):
+        response += f"• 1 Month: {re.escape(combined_scores.tipranks.one_month_gain)}\n"
+    with suppress(TypeError):
+        response += (
+            f"• 3 Months: {re.escape(combined_scores.tipranks.three_months_gain)}\n"
+        )
+    with suppress(TypeError):
+        response += (
+            f"• 6 Months: {re.escape(combined_scores.tipranks.six_months_gain)}\n"
+        )
+    with suppress(TypeError):
+        response += f"• Year To Date: {re.escape(combined_scores.tipranks.ytd_gain)}\n"
 
     return response
 
