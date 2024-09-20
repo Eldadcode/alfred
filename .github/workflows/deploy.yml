@@ -1,0 +1,25 @@
+name: Deploy Alfred
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to remote server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: "ubuntu"
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd alfred
+            git pull --rebase
+            kill -15 `pgrep screen`
+            screen -dm bash -c "${{ vars.REMOTE_PYTHON_PATH }} /home/ubuntu/alfred/telegram_bot.py"
+
+      - name: Job completion message
+        run: echo "Deployment completed successfully!"
