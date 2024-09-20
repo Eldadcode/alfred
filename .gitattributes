@@ -1,0 +1,2 @@
+usage_example.png filter=lfs diff=lfs merge=lfs -text
+alfred.jpg filter=lfs diff=lfs merge=lfs -text
