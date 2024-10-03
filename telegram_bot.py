@@ -106,6 +106,7 @@ def generate_stock_info_table_for_message(
 ):
     yahoo_ticker_info = Ticker(combined_scores.ticker).info
 
+    df.at["Company Name", combined_scores.ticker] = combined_scores.tipranks.company_name
     df.at["Danelfin General", combined_scores.ticker] = combined_scores.danelfin.general
     df.at["Danelfin Sentiment", combined_scores.ticker] = (
         combined_scores.danelfin.sentiment
@@ -149,6 +150,7 @@ def generate_stock_info_table_for_file(
 
     yahoo_ticker_info = Ticker(combined_scores.ticker).info
 
+    df.at[combined_scores.ticker, "Company Name"] = combined_scores.tipranks.company_name
     df.at[combined_scores.ticker, "Danelfin General"] = combined_scores.danelfin.general
     df.at[combined_scores.ticker, "Danelfin Sentiment"] = (
         combined_scores.danelfin.sentiment
