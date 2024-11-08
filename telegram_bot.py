@@ -31,6 +31,8 @@ from logger import alfred_logger
 from dataclasses import dataclass
 import toml
 
+from stock_utils import calculate_intrinsic_value
+
 
 WHITELIST_FILE = "whitelist.toml"
 CSV_TABLE_FILE = "stock_analysis.csv"
@@ -95,6 +97,14 @@ class CombinedScores:
         tipranks_scores = tipranks.get_analyst_projection(ticker)
         return cls(ticker, danelfin_scores, bridgewise_score, tipranks_scores)
 
+    @property
+    def intrinsic_value(self) -> float:
+        return calculate_intrinsic_value(self.ticker, 0.15)
+
+    @property
+    def margin_of_safety(self) -> float:
+        return 1 - (self.tipranks.price / self.intrinsic_value)
+
 
 def is_valid_user(user: User) -> bool:
     whitelist = toml.loads(Path(WHITELIST_FILE).read_text())
@@ -106,7 +116,9 @@ def generate_stock_info_table_for_message(
 ):
     yahoo_ticker_info = Ticker(combined_scores.ticker).info
 
-    df.at["Company Name", combined_scores.ticker] = combined_scores.tipranks.company_name
+    df.at["Company Name", combined_scores.ticker] = (
+        combined_scores.tipranks.company_name
+    )
     df.at["Danelfin General", combined_scores.ticker] = combined_scores.danelfin.general
     df.at["Danelfin Sentiment", combined_scores.ticker] = (
         combined_scores.danelfin.sentiment
@@ -124,6 +136,12 @@ def generate_stock_info_table_for_message(
     )
     df.at["Best Price Target", combined_scores.ticker] = (
         combined_scores.tipranks.best_price_target
+    )
+    df.at["Intrinsic Value", combined_scores.ticker] = (
+        f"{combined_scores.intrinsic_value:.2f}"
+    )
+    df.at["Margin Of Safety", combined_scores.ticker] = (
+        f"{combined_scores.margin_of_safety:.2f}"
     )
     df.at["Consensus", combined_scores.ticker] = combined_scores.tipranks.consensus
     df.at["P/E Ratio", combined_scores.ticker] = combined_scores.tipranks.pe_ratio
@@ -150,7 +168,9 @@ def generate_stock_info_table_for_file(
 
     yahoo_ticker_info = Ticker(combined_scores.ticker).info
 
-    df.at[combined_scores.ticker, "Company Name"] = combined_scores.tipranks.company_name
+    df.at[combined_scores.ticker, "Company Name"] = (
+        combined_scores.tipranks.company_name
+    )
     df.at[combined_scores.ticker, "Danelfin General"] = combined_scores.danelfin.general
     df.at[combined_scores.ticker, "Danelfin Sentiment"] = (
         combined_scores.danelfin.sentiment
@@ -168,6 +188,12 @@ def generate_stock_info_table_for_file(
     )
     df.at[combined_scores.ticker, "Best Price Target"] = (
         combined_scores.tipranks.best_price_target
+    )
+    df.at[combined_scores.ticker, "Intrinsic Value"] = (
+        f"{combined_scores.intrinsic_value:.2f}"
+    )
+    df.at[combined_scores.ticker, "Margin Of Safety"] = (
+        f"{combined_scores.margin_of_safety:.2f}"
     )
     df.at[combined_scores.ticker, "Consensus"] = combined_scores.tipranks.consensus
     df.at[combined_scores.ticker, "P/E Ratio"] = combined_scores.tipranks.pe_ratio
@@ -200,6 +226,14 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
     response += f"• Fundamental: {combined_scores.danelfin.fundamental}\n"
     response += "\n💷 *Bridgewise*\n"
     response += f"• Score: {re.escape(str(combined_scores.bridgewise))}\n"
+    response += "\n💎 *Valuation \\- P/E Method*\n"
+    response += (
+        f"• Intrinsic Value: {re.escape(f'{combined_scores.intrinsic_value:.2f}')}\n"
+    )
+    response += (
+        f"• Margin Of Safety: {re.escape(f'{(combined_scores.margin_of_safety * 100):.2f}%')}\n"
+    )
+
     response += "\n💸 *General Info*\n"
     response += f"• Current Price: {re.escape(str(combined_scores.tipranks.price))}\n"
     response += f"• Price Target: {re.escape(str(combined_scores.tipranks.price_target))} \\(Best: {re.escape(str(combined_scores.tipranks.best_price_target))}\\)\n"
