@@ -267,11 +267,11 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
 async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if not is_valid_user(update.message.from_user):
-        alfred_logger.warning(f"Unauthozired access from {update.message.from_user}")
+        alfred_logger.warning(f"Unauthorized access from {update.message.from_user}")
         await update.message.reply_text("You are not authorized to use Alfred")
         return ConversationHandler.END
 
-    alfred_logger.info(f"Converstaion started with {update.message.from_user}")
+    alfred_logger.info(f"Conversation started with {update.message.from_user}")
 
     await update.message.reply_text(
         "Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: `NVDA`, or multiple tickers separated by commas, for example: `AMZN`, `MSFT`, `TSLA`",
