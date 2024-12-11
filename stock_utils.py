@@ -1,4 +1,5 @@
 from yfinance import Ticker
+from typing import Optional
 
 
 def calculate_mean_pe_ratio(ticker: str, period: str = "1y") -> float:
@@ -23,7 +24,7 @@ def calculate_mean_pe_ratio(ticker: str, period: str = "1y") -> float:
     return pe_ratios.mean()
 
 
-def calculate_intrinsic_value(ticker: str, expected_growth: float) -> float:
+def calculate_intrinsic_value(ticker: str, expected_growth: float) -> Optional[float]:
     """
     Calculates the intrinsic value of a stock using the P/E (Price to Earnings) indicator.
     """
@@ -38,7 +39,11 @@ def calculate_intrinsic_value(ticker: str, expected_growth: float) -> float:
 
     yticker = Ticker(ticker)
 
-    growth_estimate_5_years = yticker.growth_estimates.loc["+5y", "stock"]
+    try:
+        growth_estimate_5_years = yticker.growth_estimates.loc["+5y", "stock"]
+    except KeyError:
+        return
+
     eps = yticker.info["trailingEps"]
 
     future_eps = get_future_eps(eps, growth_estimate_5_years, 5)
