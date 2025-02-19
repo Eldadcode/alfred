@@ -1,4 +1,4 @@
 api_keys.toml
 whitelist.toml
-venv
+*venv
 __pycache__
