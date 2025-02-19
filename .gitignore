@@ -2,3 +2,4 @@ api_keys.toml
 whitelist.toml
 *venv
 __pycache__
+subscribers.json
