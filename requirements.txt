@@ -3,7 +3,7 @@ toml
 pandas
 python-multipart
 tipranks
-python-telegram-bot
+python-telegram-bot[job-queue]
 yfinance
 tabulate
 colorlog
