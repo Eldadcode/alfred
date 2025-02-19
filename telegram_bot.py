@@ -20,6 +20,7 @@ import os
 import re
 import json
 from pathlib import Path
+import datetime
 
 from apis.danelfin import DanelfinAPI, DanelfinScores
 from apis.tipranks import MyTipRanks, TipRanksScores
@@ -34,7 +35,6 @@ from typing import Optional
 import toml
 
 from stock_utils import calculate_intrinsic_value, parse_stock_tickers
-
 
 WHITELIST_FILE = "whitelist.toml"
 CSV_TABLE_FILE = "stock_analysis.csv"
@@ -554,6 +554,44 @@ def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+async def analyze_and_send_to_subscribers(context: ContextTypes.DEFAULT_TYPE):
+    """Analyze stocks for each subscriber and send the analysis file."""
+    alfred_logger.info("Scheduler triggered: Analyzing stocks for subscribers")
+    for user_id, stocks in subscribers.items():
+        if not stocks:
+            continue
+
+        alfred_logger.info(f"Analyzing stocks for user {user_id}: {stocks}")
+        combined_scores_per_ticker = defaultdict(CombinedScores)
+        with cf.ThreadPoolExecutor() as executor:
+            future_to_ticker = {
+                executor.submit(analyze_ticker, ticker): ticker for ticker in stocks
+            }
+            for future in cf.as_completed(future_to_ticker):
+                ticker = future_to_ticker[future]
+                combined_scores_per_ticker[ticker] = future.result()
+
+        # Generate and send the analysis file
+        df = pd.DataFrame(columns=[], index=[])
+        for ticker, combined_scores in combined_scores_per_ticker.items():
+            if combined_scores.tipranks._raw_data:
+                generate_stock_info_table_for_file(df, combined_scores)
+            else:
+                alfred_logger.error(f"Received unknown ticker: {ticker}")
+                continue
+
+        try:
+            with Path(CSV_TABLE_FILE).open("w"):
+                df.to_csv(CSV_TABLE_FILE, index=True)
+
+            with Path(CSV_TABLE_FILE).open("rb") as document:
+                await context.bot.send_message("Daily stock analysis")
+                await context.bot.send_document(chat_id=user_id, document=document)
+                alfred_logger.info(f"Sent analysis file to user {user_id}")
+        finally:
+            os.remove(CSV_TABLE_FILE)
+
+
 conv_handler = ConversationHandler(
     entry_points=[
         CommandHandler("analyze", start_analyze),
@@ -577,5 +615,9 @@ conv_handler = ConversationHandler(
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 app.add_handler(conv_handler)
+
+job_queue = app.job_queue
+
+job_queue.run_daily(analyze_and_send_to_subscribers, time=datetime.time(hour=16))
 
 app.run_polling()
