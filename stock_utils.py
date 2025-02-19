@@ -53,3 +53,7 @@ def calculate_intrinsic_value(ticker: str, expected_growth: float) -> Optional[f
     future_stock_price = future_eps * average_pe_ratio
 
     return get_present_day_stock_price(future_stock_price, expected_growth, 5)
+
+
+def parse_stock_tickers(unparsed_tickers: str) -> list[str]:
+    return [x.strip().upper() for x in unparsed_tickers.split(",")]
