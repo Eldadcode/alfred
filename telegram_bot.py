@@ -18,6 +18,7 @@ import warnings
 from telegram.warnings import PTBUserWarning
 import os
 import re
+import json
 from pathlib import Path
 
 from apis.danelfin import DanelfinAPI, DanelfinScores
@@ -32,15 +33,18 @@ from dataclasses import dataclass
 from typing import Optional
 import toml
 
-from stock_utils import calculate_intrinsic_value
+from stock_utils import calculate_intrinsic_value, parse_stock_tickers
 
 
 WHITELIST_FILE = "whitelist.toml"
 CSV_TABLE_FILE = "stock_analysis.csv"
 API_KEYS_FILE = "api_keys.toml"
 LOG_CHANNEL_CHAT_ID = -1002231338174
-PICK_STOCKS = 1
+PICK_STOCK_FOR_ANALYZE = 1
 CHOOSE_OUTPUT = 2
+SUBSCRIBE_PICK_OPTION = 2
+CHOOSE_SUBSCRIBE = 3
+PICK_STOCKS_FOR_SUBSCRIBE = 4
 
 warnings.filterwarnings("ignore", category=PTBUserWarning)
 
@@ -77,6 +81,11 @@ companies_from_scanner = bridgewise.get_companies_from_scanner()
 
 tr_username, tr_password = api_keys["tipranks"].split(":")
 tipranks = MyTipRanks(tr_username, tr_password)
+
+if not Path("subscribers.json").exists():
+    Path("subscribers.json").write_text("{}")
+
+subscribers = json.loads(Path("subscribers.json").read_text())
 
 alfred_logger.info("Alfred Online")
 
@@ -265,6 +274,29 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
     return response
 
 
+async def start_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if not is_valid_user(update.message.from_user):
+        alfred_logger.warning(f"Unauthorized access from {update.message.from_user}")
+        await update.message.reply_text("You are not authorized to use Alfred")
+        return ConversationHandler.END
+
+    alfred_logger.info(
+        f"Subscribe conversation started with {update.message.from_user}"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("📃 Display 📃", callback_data="display")],
+        [InlineKeyboardButton("🟢 Add 🟢", callback_data="add")],
+        [InlineKeyboardButton("🔴 Remove 🔴", callback_data="remove")],
+        [InlineKeyboardButton("🧹 Clear 🧹", callback_data="clear")],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Pick an option", reply_markup=reply_markup)
+
+    return CHOOSE_SUBSCRIBE
+
+
 async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if not is_valid_user(update.message.from_user):
@@ -272,13 +304,13 @@ async def start_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         await update.message.reply_text("You are not authorized to use Alfred")
         return ConversationHandler.END
 
-    alfred_logger.info(f"Conversation started with {update.message.from_user}")
+    alfred_logger.info(f"Analyze conversation started with {update.message.from_user}")
 
     await update.message.reply_text(
         "Which stocks would you like me to analyze? 🕵️‍♂️\n\nI can analyze a single ticker, such as: `NVDA`, or multiple tickers separated by commas, for example: `AMZN`, `MSFT`, `TSLA`",
         parse_mode=ParseMode.MARKDOWN_V2,
     )
-    return PICK_STOCKS
+    return PICK_STOCK_FOR_ANALYZE
 
 
 def analyze_ticker(ticker: str) -> CombinedScores:
@@ -286,9 +318,60 @@ def analyze_ticker(ticker: str) -> CombinedScores:
     return CombinedScores.from_ticker(ticker)
 
 
-async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+def add_stocks_for_subscribe(tickers: list[str], user_id: str) -> None:
+    if user_id not in subscribers:
+        subscribers[user_id] = []
+    for ticker in tickers:
+        if ticker not in subscribers[user_id]:
+            subscribers[user_id].append(ticker)
+    Path("subscribers.json").write_text(json.dumps(subscribers))
+
+
+def remove_stocks_for_subscribe(tickers: list[str], user_id: int) -> None:
+    if user_id in subscribers:
+        for ticker in tickers:
+            if ticker in subscribers[user_id]:
+                subscribers[user_id].remove(ticker)
+        Path("subscribers.json").write_text(json.dumps(subscribers))
+
+
+async def receive_stocks_for_subscribe(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+
+    tickers = parse_stock_tickers(update.message.text)
+    alfred_logger.info(f"""Stocks picked: {tickers}""")
+
+    if context.user_data["types"] == "add":
+        add_stocks_for_subscribe(tickers, str(update.message.from_user.id))
+        await update.message.reply_text(
+            "Successfully added stocks to subscription list"
+        )
+        alfred_logger.info(
+            f"User {update.message.from_user} added {tickers} to subscription"
+        )
+    if context.user_data["types"] == "remove":
+        print("nabaz")
+        try:
+            remove_stocks_for_subscribe(tickers, str(update.message.from_user.id))
+            await update.message.reply_text(
+                "Successfully removed stocks from subscription list"
+            )
+            alfred_logger.info(
+                f"User {update.message.from_user} removed {tickers} from subscription"
+            )
+        except Exception as e:
+            alfred_logger.error(f"{type(e).__name__} {e}")
+            return ConversationHandler.END
+
+    return CHOOSE_SUBSCRIBE
+
+
+async def receive_stocks_for_analyze(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
     # Store user stocks input
-    tickers = [x.strip().upper() for x in update.message.text.split(",")]
+    tickers = parse_stock_tickers(update.message.text)
 
     alfred_logger.info(f"""Stocks picked: {tickers}""")
     await update.message.reply_text(
@@ -317,6 +400,51 @@ async def receive_stocks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "How would you like to receive the output?", reply_markup=reply_markup
     )
     return CHOOSE_OUTPUT
+
+
+async def choose_subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+
+    context.user_data["types"] = query.data
+    if query.data == "add":
+        try:
+            await query.message.reply_text(
+                "Which stocks would you like to subscribe to?\n\nEnter single ticker, such as: `NVDA`, or multiple tickers separated by commas, for example: `AMZN`, `MSFT`, `TSLA`",
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
+            return PICK_STOCKS_FOR_SUBSCRIBE
+        except Exception as e:
+            alfred_logger.error(f"{type(e).__name__} {e}")
+            return ConversationHandler.END
+
+    elif query.data == "remove":
+        try:
+            await query.message.reply_text(
+                "Which stocks would you like to unsubscribe from?\n\nEnter single ticker, such as: `NVDA`, or multiple tickers separated by commas, for example: `AMZN`, `MSFT`, `TSLA`",
+                parse_mode=ParseMode.MARKDOWN_V2,
+            )
+            return PICK_STOCKS_FOR_SUBSCRIBE
+        except Exception as e:
+            alfred_logger.error(f"{type(e).__name__} {e}")
+            return ConversationHandler.END
+
+    elif query.data == "clear":
+        subscribers[str(query.from_user.id)] = []
+        Path("subscribers.json").write_text(json.dumps(subscribers))
+        await query.message.reply_text("Subscriptions cleared successfully 🧹")
+        alfred_logger.info(f"Cleared subscriptions for {update.message.from_user}")
+
+    elif query.data == "display":
+        user_subscriptions = subscribers.get(str(query.from_user.id), [])
+        if not user_subscriptions:
+            await query.message.reply_text("You have no subscriptions.")
+        else:
+            await query.message.reply_text(
+                f"Your subscriptions: {', '.join(user_subscriptions)}"
+            )
+
+    return CHOOSE_SUBSCRIBE
 
 
 async def choose_output(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -428,13 +556,20 @@ def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 conv_handler = ConversationHandler(
     entry_points=[
-        CommandHandler("analyze", start_analyze)
+        CommandHandler("analyze", start_analyze),
+        CommandHandler("subscribe", start_subscribe),
     ],  # Command to start the conversation
     states={
-        PICK_STOCKS: [
-            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_stocks)
+        PICK_STOCK_FOR_ANALYZE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, receive_stocks_for_analyze)
         ],  # Input handling state
+        PICK_STOCKS_FOR_SUBSCRIBE: [
+            MessageHandler(
+                filters.TEXT & ~filters.COMMAND, receive_stocks_for_subscribe
+            )
+        ],  # Input handling stat
         CHOOSE_OUTPUT: [CallbackQueryHandler(choose_output)],
+        CHOOSE_SUBSCRIBE: [CallbackQueryHandler(choose_subscribe)],
     },
     fallbacks=[CommandHandler("cancel", cancel)],  # Fallback for cancellation,
     allow_reentry=True,
