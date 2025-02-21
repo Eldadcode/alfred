@@ -35,6 +35,7 @@ from typing import Optional
 import toml
 
 from stock_utils import calculate_intrinsic_value, parse_stock_tickers
+from pytz import timezone
 
 WHITELIST_FILE = "whitelist.toml"
 CSV_TABLE_FILE = "stock_analysis.csv"
@@ -620,6 +621,13 @@ app.add_handler(conv_handler)
 
 job_queue = app.job_queue
 
-job_queue.run_daily(analyze_and_send_to_subscribers, time=datetime.time(hour=16))
+job_queue.run_daily(
+    analyze_and_send_to_subscribers,
+    time=datetime.time(
+        hour=16,
+        minute=25,
+        tzinfo=timezone("Asia/Jerusalem"),
+    ),
+)
 
 app.run_polling()
