@@ -585,7 +585,9 @@ async def analyze_and_send_to_subscribers(context: ContextTypes.DEFAULT_TYPE):
                 df.to_csv(CSV_TABLE_FILE, index=True)
 
             with Path(CSV_TABLE_FILE).open("rb") as document:
-                await context.bot.send_message("Daily stock analysis")
+                await context.bot.send_message(
+                    chat_id=user_id, text="📅 Daily Stock Analysis"
+                )
                 await context.bot.send_document(chat_id=user_id, document=document)
                 alfred_logger.info(f"Sent analysis file to user {user_id}")
         finally:
