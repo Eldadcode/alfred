@@ -18,7 +18,7 @@ jobs:
           script: |
             cd alfred
             git pull --rebase
-            kill -15 `pgrep screen`
+            kill -15 `pgrep screen` || true
             screen -dm bash -c "${{ vars.REMOTE_PYTHON_PATH }} /home/ubuntu/alfred/telegram_bot.py"
 
       - name: Job completion message
