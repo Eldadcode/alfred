@@ -349,7 +349,7 @@ async def receive_stocks_for_subscribe(
             "Successfully added stocks to subscription list"
         )
         alfred_logger.info(
-            f"User {update.message.from_user} added {tickers} to subscription"
+            f"{update.message.from_user} added {tickers} to subscription"
         )
     if context.user_data["types"] == "remove":
         print("nabaz")
@@ -359,7 +359,7 @@ async def receive_stocks_for_subscribe(
                 "Successfully removed stocks from subscription list"
             )
             alfred_logger.info(
-                f"User {update.message.from_user} removed {tickers} from subscription"
+                f"{update.message.from_user} removed {tickers} from subscription"
             )
         except Exception as e:
             alfred_logger.error(f"{type(e).__name__} {e}")
