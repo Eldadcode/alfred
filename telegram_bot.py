@@ -24,7 +24,6 @@ import datetime
 
 from apis.danelfin import DanelfinAPI, DanelfinScores
 from apis.tipranks import MyTipRanks, TipRanksScores
-from apis.bridgewise import BridgewiseAPI
 from yfinance import Ticker
 from contextlib import suppress
 import pandas as pd
@@ -77,9 +76,6 @@ alfred_logger.addHandler(telegram_handler)
 
 danelfin = DanelfinAPI(api_keys["danelfin"])
 
-bridgewise = BridgewiseAPI(api_keys["bridgewise"])
-companies_from_scanner = bridgewise.get_companies_from_scanner()
-
 tr_username, tr_password = api_keys["tipranks"].split(":")
 tipranks = MyTipRanks(tr_username, tr_password)
 
@@ -95,18 +91,14 @@ alfred_logger.info("Alfred Online")
 class CombinedScores:
     ticker: str
     danelfin: DanelfinScores
-    bridgewise: int
     tipranks: TipRanksScores
 
     @classmethod
     def from_ticker(cls, ticker: str):
         danelfin_scores = danelfin.get_ticker_ai_scores(ticker)
-        bridgewise_score = bridgewise.get_ticker_ai_score(
-            companies_from_scanner, ticker
-        )
 
         tipranks_scores = tipranks.get_analyst_projection(ticker)
-        return cls(ticker, danelfin_scores, bridgewise_score, tipranks_scores)
+        return cls(ticker, danelfin_scores, tipranks_scores)
 
     @property
     def intrinsic_value(self) -> Optional[float]:
@@ -141,7 +133,6 @@ def generate_stock_info_table_for_message(
     df.at["Danelfin Fundamental", combined_scores.ticker] = (
         combined_scores.danelfin.fundamental
     )
-    df.at["Bridgewise Score", combined_scores.ticker] = combined_scores.bridgewise
     df.at["Current Price", combined_scores.ticker] = combined_scores.tipranks.price
     df.at["Price Target", combined_scores.ticker] = (
         combined_scores.tipranks.price_target
@@ -194,7 +185,6 @@ def generate_stock_info_table_for_file(
     df.at[combined_scores.ticker, "Danelfin Fundamental"] = (
         combined_scores.danelfin.fundamental
     )
-    df.at[combined_scores.ticker, "Bridgewise Score"] = combined_scores.bridgewise
     df.at[combined_scores.ticker, "Current Price"] = combined_scores.tipranks.price
     df.at[combined_scores.ticker, "Price Target"] = (
         combined_scores.tipranks.price_target
@@ -238,8 +228,6 @@ def generate_stock_info_message(combined_scores: CombinedScores) -> str:
     response += f"• Sentiment: {combined_scores.danelfin.sentiment}\n"
     response += f"• Technical: {combined_scores.danelfin.technical}\n"
     response += f"• Fundamental: {combined_scores.danelfin.fundamental}\n"
-    response += "\n💷 *Bridgewise*\n"
-    response += f"• Score: {re.escape(str(combined_scores.bridgewise))}\n"
     if combined_scores.intrinsic_value:
         response += "\n💎 *Valuation \\- P/E Method*\n"
         response += f"• Intrinsic Value: {re.escape(f'{combined_scores.intrinsic_value:.2f}')}\n"

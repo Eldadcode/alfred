@@ -8,6 +8,7 @@ class BridgewiseAPI:
     API_URL = "https://api.bridgewise.com/v2"
 
     def __init__(self, key: str):
+        raise DeprecationWarning("This API is deprecated!")
         self.key = key
 
     def _make_api_request(
